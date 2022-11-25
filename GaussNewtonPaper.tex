@@ -1,0 +1,625 @@
+\documentclass[a4paper, 11pt]{article}
+
+\usepackage{fancyhdr}
+\usepackage{extramarks}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{amsthm}
+\usepackage{amsfonts}
+\usepackage{tikz}
+\usepackage[noend]{algpseudocode}
+\usepackage{algorithmicx,algorithm}
+%\usepackage[plain]{algorithm}
+\usepackage{algpseudocode}
+\usepackage{multirow}
+\usepackage{subfigure,color}
+\usepackage{epstopdf}
+\usepackage{graphicx}
+\usepackage{animate}
+\graphicspath{{figures/}}
+
+\numberwithin{equation}{section}
+\usetikzlibrary{automata,positioning}
+
+\topmargin=-0.45in
+\evensidemargin=0in
+\oddsidemargin=0in
+\textwidth=6.5in
+\textheight=9.0in
+\headsep=0.25in
+\linespread{1.1}
+\renewcommand\headrulewidth{0.4pt}
+\renewcommand\footrulewidth{0.4pt}
+\setlength\parindent{0pt}
+
+\newcommand{\alg}[1]{\textsc{\bfseries \footnotesize #1}}
+\newcommand{\deriv}[1]{\frac{\mathrm{d}}{\mathrm{d}x} (#1)}
+\newcommand{\pderiv}[2]{\frac{\partial}{\partial #1} (#2)}
+\newcommand{\dx}{\mathrm{d}x}
+\newcommand{\solution}{\textbf{\large Solution}}
+\newcommand{\E}{\mathrm{E}}
+\newcommand{\Var}{\mathrm{Var}}
+\newcommand{\Cov}{\mathrm{Cov}}
+\newcommand{\Bias}{\mathrm{Bias}}
+\newtheorem{theorem}{\textbf{Theorem}}
+\newtheorem{corollary}{\textbf{Corollary}}
+\newtheorem{definition}{\textbf{Definition}}
+\newtheorem{lemma}{\textbf{Lemma}}
+\newtheorem{proposition}{\textbf{Proposition}}
+\newtheorem{Algorithm}{\textbf{Algorithm}}
+\newtheorem{scheme}{\textbf{Scheme}}
+\newtheorem{assumption}{\textbf{Assumption}}
+\newtheorem{remark}{\textbf{Remark}}
+\newtheorem{example}{\textbf{Example}}
+
+\begin{document}
+
+\section{Set up}
+\quad\quad Let us consider the second order elliptic equation 
+\begin{align}\label{EP1}
+\mathcal{L}v = f \text{ in } \Omega,
+\end{align}
+where $\Omega \in \mathbb{R}^{d}$ is an open subset, $d \geq 1$. $\mathcal{L}$ is the second order elliptic operator defined by 
+\begin{align}\label{OperatorL}
+\mathcal{L}v = -\sum_{i=1}^{d}\sum_{j=1}^{d} a_{i,j} \dfrac{\partial v}{\partial x_i}\dfrac{\partial v}{\partial x_j} + \sum_{k=1}^{d} b_{k} \dfrac{\partial v}{\partial x_k} + c v. \quad \forall v \in C^2(\Omega)
+\end{align} 
+In order to ensure the existence and uniqueness of the weak solution for problem (\ref{EP1}), the operator $\mathcal{L}$ should be assumed to satisfy 
+\begin{align}\label{Assumption1}
+a_{i,j} \in L^{\infty}(\Omega), \text{ } 1\leq i,j\leq d,
+\end{align}
+and there exist positive constants $\lambda$ and $\Lambda$, such that
+\begin{align}\label{Assumption2}
+\lambda \vert \boldsymbol{\xi} \vert^2 \leq \sum_{i=1}^{d}\sum_{j=1}^{d} a_{i,j}(x) \xi_i\xi_j \leq \Lambda \vert \boldsymbol{\xi} \vert^2,\text{ } \forall \boldsymbol{\xi}\in \mathbb{R}^{d},\text{ } x\in \Omega.
+\end{align}
+For the simplicity of notations, we consider the following second-order partial differential equation: {\color{blue} (at the end of the article, we need a remark to claim that all the results can be applied on the general form (\ref{OperatorL}) with simply Dirichlet BC)}
+\begin{align} \label{2ndPDE}
+-a\Delta v(x) +cv(x) &= f(x), \text{ in } \Omega\\
+\dfrac{\partial v}{\partial n } &=0, \text{ on } \partial \Omega
+\end{align}
+where $a\geq 0,c\geq 0$ are constants, so that the conditions (\ref{Assumption1})-(\ref{Assumption2}) are satisfied. Moreover, we define the admissible set on $\Omega$
+\begin{align}
+V = H^1(\Omega).
+\end{align} 
+Then the PDE (\ref{2ndPDE}) is equivalent to the following energy minimization:
+\begin{align}\label{minEnergy}
+\min_{w\in V} \mathcal{J}(w) = \int_{\Omega}\left( \dfrac{a}{2} \vert \nabla w(x) \vert^2 + \dfrac{c}{2} w(x)^2 - f(x)w(x) \right) dx.
+\end{align}
+When $a \neq 0$, minimizing (\ref{minEnergy}) is equivalent to solving the PDE (\ref{2ndPDE}); while $a = 0$ but $c \neq 0$, (\ref{minEnergy}) degenerates into a function approximation problem. The minimization task can be finished by learning algorithms such as the deep neural network(DNN), which is referred to as the Deep Ritz method in \cite{RitzE2017}. In practice, the energy integral can be computed by means of the numerical quadratures, such as the Gauss quadrature and the Monte-Carlo method. 
+
+\section{Preliminaries}
+\quad \quad {\color{blue} In this section, we will give an introduction of the $\text{ReLU}^k$-DNN model and a convergence result of the Deep Ritz method. But the discussion in the following does not specify the form of activation functions.} Firstly, let us consider about the energy minimization problem (\ref{minEnergy}). Let the minimizer be 
+\begin{align} \label{minimizer}
+v = \arg\min_{w\in V} \mathcal{J}(w) = a(w,w) - (f,w),
+\end{align} 
+where $a(w,z) = \int_{\Omega} \left(\dfrac{a}{2} \nabla w \cdot \nabla z + \dfrac{c}{2} wz\right) dx$ is a symmetric bilinear form. 
+
+\begin{lemma}\label{lemma1}
+Suppose $v$ is the minimizer of (\ref{minEnergy}) or the solution of (\ref{2ndPDE}), then it holds
+\begin{align}
+\mathcal{J}(u) - \mathcal{J}(v) = \Vert u-v \Vert_a^2.
+\end{align}
+for $\forall u\in V$. Here 
+\begin{align}
+\Vert u \Vert_a^2 = a(u,u).
+\end{align}
+\end{lemma}
+\begin{proof}
+Let $v$ be the solution of (\ref{2ndPDE}) and $u\in V$ be arbitrary. Since $v$ is the minimizer, then we have that 
+\begin{align}
+0 = \delta \mathcal{J}(v)[u] = 2a(v,u) - (f,u), \quad \forall u \in V.
+\end{align}
+Then by a simple computation, it is easy to see that
+\begin{align}
+\mathcal{J}(u) - \mathcal{J}(v) &=  a(u,u) - (f,u) -  a(v,v) + (f,v)\\
+& = a(u,u) - (f,u) + a(v,v) \\
+& = a(u,u) - 2a(v,u) + a(v,v) \\
+& = \Vert u-v \Vert_a^2
+\end{align}
+\end{proof}
+
+\begin{remark}
+In general,  the Deep Ritz method for second-order partial differential equations asks for an admissible set with at least $H^1$ regularity. With different training algorithms, more regularity might be required for this method. We therefore need an appropriate choice for the activation function in DNN models to make sure they are $H^k$ functions. For instance, let the $\text{ReLU}^k$-DNN with one hidden layer be denoted by $V_N^k = \lbrace \sum_{i=1}^{N} a_{i}\text{ReLU}^k\left(w_{i} x+b_{i}\right), a_{i}, b_{i} \in \mathbb{R}^{1}, w_{i} \in \mathbb{R}^{1 \times d} \rbrace$, then we have $V_N^k(\Omega) \subset H^k(\Omega), k\geq 1$. The gradient method will require first-order derivatives of $w_i$ and $b_i$ inside the integration of (\ref{minEnergy}), thus $k\geq 2$ as the power of $\text{ReLU}$.
+\end{remark}
+
+\quad\quad Now Let the DNN model be denoted by $u(x,\theta)$, where $x\in \Omega$ and $\theta \in \mathbb{R}^m$. Here the dimension $m$ of the parameter space is related to the number of neurons in specific models. The admissible set on $\Omega$ for the energy functional is then changed into the space of all the $\text{ReLU}^k$-DNN functions with $J$ hidden layers, which is denoted by $DNN_J$. In the following, we always assume that the DNN function space $DNN_J \subset V = H^1$, which suggests that the DNN model we use should be at least a $C^0$ function. We have the approximation result for $DNN_{J}$:
+
+\begin{lemma}\label{lemma2}
+For $\forall \epsilon > 0$, there exist $J\in \mathbb{N}^{+}$ and $m\in \mathbb{N}^{+}$, 
+such that $u(\cdot,\theta) \in DNN_{J}$, $\theta\in \mathbb{R}^m$, and for $\theta^*$ being the minimizer in $\mathbb{R}^m$:
+\begin{align}\label{thetaStar}
+\theta^* = \arg\min_{\theta} \mathcal{J}(\theta) = \int_{\Omega} \left( \dfrac{a}{2} \vert\nabla u(x,\theta)\vert^2 + \dfrac{c}{2} u(x,\theta)^2 - f(x) u(x,\theta) \right) dx,
+\end{align}
+ it holds 
+\begin{align}
+\Vert u(\cdot,\theta^*) - v \Vert_{L^2(\Omega)} & \lesssim \epsilon \\
+\big | u(\cdot,\theta^*) - v \big |_{H^1(\Omega)} & \lesssim \epsilon.
+\end{align}
+\end{lemma}
+
+We will use the notation "$A \lesssim B$" to denote $A \leq C B$ for some constant $C$  independent of crucial parameters such as $\theta$.
+
+\begin{proof}
+From the Weierstrass theorem in Sobolev space {\color{blue}$W^1_p(1\leq p \leq \infty)$} and the fact that $\text{ReLU}^k$-DNN functions are piecewise polynomials that belong to $H^1$, it can be verified that there exist $J\in \mathbb{N}^{+}$, $m\in \mathbb{N}^{+}$ and $\theta\in \mathbb{R}^m$, such that $u(\cdot,\theta)\in DNN_{J}$, and
+\begin{align}
+\Vert u(\cdot,\theta) - v \Vert_a \lesssim \Vert u(\cdot,\theta)  - v \Vert_{H^1(\Omega)} < \epsilon,
+\end{align}
+In particular, when considering $\text{ReLU}^1$-DNN functions, one can refer to \cite{XuJCM2018} for estimations of a sufficiently large depth $J$ and a sufficiently large number of neurons to represent all the piecewise linear functions in $\mathbb{R}^d$.
+
+\quad\quad Next, since $DNN_{J} \subset V$, it holds that
+\begin{align}
+\mathcal{J}(u(\cdot,\theta)) \geq \mathcal{J}(u(\cdot,\theta^*)) \geq \mathcal{J}(v),
+\end{align}
+which, together with Lemma~\ref{lemma1}, implies that 
+\begin{align}
+\Vert u(\cdot,\theta^*) - v \Vert_{L^2(\Omega)} \lesssim \Vert u(\cdot,\theta^*) -v \Vert_a \leq \Vert u(\cdot,\theta) -v \Vert_a &< \epsilon \\
+\big | u(\cdot,\theta^*) - v  \big |_{H^1(\Omega)} \lesssim \Vert u(\cdot,\theta^*) -v \Vert_a \leq \Vert u(\cdot,\theta) -v \Vert_a &< \epsilon.
+\end{align}
+\end{proof} 
+
+\quad\quad Based on the results above, we have an estimation for the residual function:
+\begin{lemma}\label{lemma3}
+For $\forall \epsilon > 0$, there exist $\delta > 0$, $J\in \mathbb{N}^{+}$ and $m\in \mathbb{N}^{+}$, 
+such that $\theta\in \mathbb{R}^m$, $u(\cdot,\theta) \in DNN_J\subset H^1(\Omega)$, and for $ \theta^*$ being defined by (\ref{thetaStar}), $
+\Vert \theta-\theta^* \Vert < \delta$, it holds 
+\begin{align}\label{lemma3_1}
+\Vert u(\cdot,\theta) -v \Vert_{L^2(\Omega)} <\epsilon 
+\end{align}
+and
+\begin{align}\label{lemma3_2}
+\int_{\Omega} \left(a\nabla u(x,\theta) \cdot \nabla w(x) + cu(x,\theta) w(x) - f(x) w(x) \right) dx < C \epsilon,\quad \forall w \in H^1(\Omega)
+\end{align}
+where $C >0$ is independent of $\theta$.
+\end{lemma}
+\begin{proof}
+By the continuity of $u(\cdot,\theta)$ with respect to $\theta$, it is easy to see from Lemma~\ref{lemma2} that 
+\begin{align}\label{lemma3one}
+\Vert u(\cdot,\theta) -v \Vert_{L^2(\Omega)} \leq \Vert u(\cdot,\theta)-u(\cdot,\theta^*) \Vert_{L^2(\Omega)} + \Vert u(\cdot,\theta^*) - v \Vert_{L^2(\Omega)} < \epsilon.
+\end{align}
+Next, we have for $\forall w \in H^1(\Omega)$,
+\begin{align}
+\left( r(u(\cdot,\theta)), w \right)_{L^2(\Omega)} &= \int_{\Omega} \left(a\nabla u(x,\theta) \cdot \nabla w(x) + c u(x,\theta) w(x) - f(x) w(x) \right) dx \\ 
+&= \int_{\Omega} \left( a\nabla (u(x,\theta) - v(x)) \cdot \nabla w(x) + c (u(x,\theta) - v(x)) w(x) \right) dx\\ 
+& \lesssim \big | u(\cdot,\theta) -v \big |_{H^1(\Omega)} \big | w \big |_{H^1(\Omega)} + \Vert u(\cdot,\theta) -v \Vert_{L^2(\Omega)} \Vert w \Vert_{L^2(\Omega)}. 
+\end{align}
+Since $w \in H^1(\Omega)$, we can conclude form Lemma \ref{lemma2} that the estimation (\ref{lemma3_2}) is valid.
+\end{proof}
+
+
+
+\section{Gauss-Newton Iteration with numerical quadrature}
+\subsection{The collocation problem}
+\quad \quad Let $u(x,\theta)$ be a learning model to approximate the exact solution $v(x)$. In order to solve the PDE with learning algorithms, one possible way is to construct an alternative problem with collocation points $\lbrace x_1,x_2,\cdots, x_N \rbrace \subset \Omega$ and $\lbrace x^b_1, x^b_2, \cdots, x^b_n \rbrace \subset \partial \Omega$, such that :
+\begin{align}\label{collocation}
+\boldsymbol{F}(x, \theta) = 
+\begin{pmatrix}
+-a\Delta u(x_1,\theta) + cu(x_1,\theta) - f(x_1) & \\
+-a\Delta u(x_2,\theta) + cu(x_2,\theta) - f(x_2) & \\
+\vdots & \\
+-a\Delta u(x_N,\theta) + cu(x_N,\theta) - f(x_N) & \\
+\nabla u(x_1^b,\theta) \cdot \boldsymbol{n} & \\
+\nabla u(x_2^b,\theta) \cdot \boldsymbol{n} & \\
+\vdots & \\
+\nabla u(x_n^b,\theta) \cdot \boldsymbol{n} & \\
+\end{pmatrix} = \boldsymbol{0}.
+\end{align}
+where $\boldsymbol{n}$ is the outer normal unit vector of $\partial \Omega$ and $\theta =\lbrace \theta_1, \theta_2,\cdots, \theta_m \rbrace$ represents the parameters in the learning model $u(x,\theta)$ . Therefore, an optimal choice of $\theta$ should be the one that minimizes $\Vert \boldsymbol{F}(x,\theta) \Vert$. Let us consider the Gauss-Newton method for solving the collocation point problem~(\ref{collocation}), which can be written as
+\begin{align}\label{colloIter}
+\theta_{k+1} = \theta_k - (\boldsymbol{\operatorname{JF}} (x,\theta_k))^{\dagger}  \boldsymbol{F}(x,\theta_k),\quad k=0,1,2,\cdots
+\end{align}
+where $\boldsymbol{\operatorname{JF}} $ is the Jacobi matrix, $\epsilon_1>0$ is a sufficiently small constant and the matrix inverse is the Moore-Penrose inverse. Hereafter the gradient operator will always be regarded as a column vector for both  $\theta$ and  $\boldsymbol{x}$. As for the matrix of mixed second-order derivatives, we define $\nabla_{\theta} \nabla$ to be
+\begin{align}
+\begin{bmatrix}
+\partial_{x_1} \partial_{\theta_1} & \partial_{x_2} \partial_{\theta_1} &\cdots & \partial_{x_d} \partial_{\theta_1} & \\
+\partial_{x_1} \partial_{\theta_2} & \partial_{x_2} \partial_{\theta_2} &\cdots & \partial_{x_d} \partial_{\theta_2} & \\
+\vdots                                           &                                          \vdots &\cdots &
+                                          \vdots &\\
+\partial_{x_1} \partial_{\theta_m} & \partial_{x_2} \partial_{\theta_m} &\cdots & \partial_{x_d} \partial_{\theta_m} & 
+\end{bmatrix}.
+\end{align}
+So we have 
+\begin{align}
+\boldsymbol{\operatorname{JF}} =
+\begin{bmatrix}
+ -\nabla_{\theta} \Delta u(x,\theta)^{T} + \nabla_{\theta} u(x,\theta)^{T}  \\
+\left(\nabla_{\theta} \nabla u(x^b,\theta)\cdot \boldsymbol{n}\right)^{T} \\
+\end{bmatrix}
+\in \mathbb{R}^{(N+n)\times m}.
+\end{align}
+
+\subsection{The variational problem}
+\quad\quad Next let us write the Newton iteration of the Deep Ritz method with Gauss quadrature rule. The loss function is defined as follows
+\begin{align}\label{lossfuncL}
+L(\theta) = \int_{\Omega} \dfrac{1}{2} \vert\nabla u(x,\theta)\vert^2 + \dfrac{1}{2} u(x,\theta)^2 - f(x) u(x,\theta) dx.
+\end{align}
+So the minimization will be considered within a smaller admissible set, i.e., the DNN function space. We can compute the gradient of $L(\theta)$:
+\begin{align}\label{gradL}
+\nabla_{\theta}L(\theta) = \int_{\Omega} \nabla_{\theta} \nabla u(x,\theta) \nabla u(x,\theta) + u(x,\theta) \nabla_{\theta}u(x,\theta) - f(x)\nabla_{\theta}u(x,\theta) dx
+\end{align}
+Then it can be verified that the formula of the Hessian of $L(\theta)$, which is denoted by $\boldsymbol{\operatorname{HL}}(\theta)$, is as follows:
+\begin{align}\label{HessianL}
+\boldsymbol{\operatorname{HL}}(\theta) &= \int_{\Omega} \nabla_{\theta} \nabla u(x,\theta) \cdot
+\nabla_{\theta}  \nabla u(x,\theta)^{T}
++ \nabla_{\theta}u(x,\theta) \cdot \nabla_{\theta}u(x,\theta)^{T} dx \\
+&+ \int_{\Omega} \nabla^2_{\theta} \nabla u(x,\theta) \cdot \nabla u(x,\theta) + u(x,\theta) \nabla^2_{\theta}u(x,\theta) - f(x)\nabla^2_{\theta}u(x,\theta) dx
+\\
+&:= \boldsymbol{J}(\theta)+  \boldsymbol{Q}(\theta), 
+\end{align}
+The Hessian can be taken apart into two matrix $\boldsymbol{J}(\theta)$ and $\boldsymbol{Q}(\theta)$, standing for the first-order and second-order component of $\theta$ respectively. As a straight consequence of Lemma \ref{lemma3}, we have 
+
+\begin{lemma}\label{lemma4}
+For $\forall \epsilon > 0$, there exist $\delta > 0$, $J\in \mathbb{N}^{+}$ and $m\in \mathbb{N}^{+}$, 
+such that $ \theta\in \mathbb{R}^m$, $DNN_J\subset H^1(\Omega)$, and for $
+\Vert \theta-\theta^* \Vert < \delta$, $ \theta^*$ being defined by (\ref{thetaStar}), if $ D^2_{\theta} u(x,\theta) \in H^1(\Omega)$, then it holds 
+\begin{align}
+\Vert \boldsymbol{Q}(\theta)\Vert < \epsilon.
+\end{align}
+\end{lemma}
+
+Therefore, it is reasonable to consider the first-order approximation of the Hessian $\boldsymbol{J}(\theta) \approx \boldsymbol{\operatorname{HL}}(\theta)$. The Gauss-Newton iteration for the variational problem is then written as
+\begin{align}\label{varIter}
+\theta_{k+1} = \theta_k - \boldsymbol{J} (\theta_k)^{\dagger}  \nabla_{\theta}L(\theta_k), \quad k=0,1,2,\cdots
+\end{align}
+where the matrix inverse is the Moore-Penrose inverse. Again, we will present an appropriate perturbed Gauss-Newton iteration for the variational problem in the following section.
+
+\subsection{The consistency between the collocation and variational problem}
+\quad\quad Again, by the divergence theorem on $ \boldsymbol{J}(\theta)$, we have
+\begin{align}\label{JofTheta}
+ \boldsymbol{J}(\theta) &= \int_{\Omega} \nabla_{\theta} u(x,\theta) \cdot \left( -\nabla_{\theta} \Delta u(x,\theta) + \nabla_{\theta} u(x,\theta) \right)^{T}  dx \nonumber \\
+& + \int_{\partial \Omega} \nabla_{\theta} u(x,\theta) \cdot \dfrac{\partial  \nabla_{\theta} u(x,\theta)}{\partial \boldsymbol{n}}^{T}dS.
+\end{align}
+Therefore, if all the integrals are computed by the Gauss quadrature rule, then the iteration for the Deep Ritz method is consistent with the  iteration of the collocation problem (\ref{colloIter}). In fact, with the quadrature points $\boldsymbol{x} = (x_1, x_2, \cdots,  x_N)^{T}$ and the quadrature weights ${\color{blue} \boldsymbol{w} = (w_1,w_2,\dots,w_N)^{T}}$, 
+the first part of (\ref{JofTheta}) can be computed through 
+\begin{align}
+ \int_{\Omega}  \nabla_{\theta} u(x,\theta) \cdot \left( -\nabla_{\theta} \Delta u(x,\theta) + \nabla_{\theta} u(x,\theta) \right)^{T} dx = \sum_{i=1}^{N}{\color{blue}w_i}\nabla_{\theta} u(x_i,\theta) \cdot \left( -\nabla_{\theta} \Delta u(x_i,\theta) + \nabla_{\theta} u(x_i,\theta) \right)^{T}.
+\end{align}
+With the boundary quadrature points $\boldsymbol{x^b} = (x^b_1, x^b_2, \cdots,  x^b_n)^{T}$ and the weights ${\color{blue} \boldsymbol{w^b} = (w^b_1, w^b_2, \cdots, w^b_n)^{T}}$, the second part of (\ref{JofTheta}) can be computed by
+\begin{align}
+ \int_{\partial \Omega}   \nabla_{\theta} u(x,\theta) \cdot \dfrac{\partial  \nabla_{\theta} u(x,\theta)}{\partial \boldsymbol{n}}^{T} dS  = \sum_{j=1}^{n} w^b_j \nabla_{\theta} u(x_j,\theta) \cdot \dfrac{\partial  \nabla_{\theta} u(x_j,\theta)}{\partial \boldsymbol{n}}^{T} 
+\end{align}
+
+Therefore, we have 
+\begin{align}
+ \boldsymbol{J}(\theta) =
+  \begin{bmatrix}
+  {\color{blue}w_1} \nabla_{\theta} u(x_1,\theta)  & \cdots & {\color{blue}w_N} \nabla_{\theta}u(x_N,\theta)  & 
+{\color{blue}w^b_1} \nabla_{\theta}  u(x^b_1,\theta)  & \cdots &
+{\color{blue}w^b_n} \nabla_{\theta}  u(x^b_n,\theta) 
+  \end{bmatrix}
+\boldsymbol{\operatorname{JF}}  :=\boldsymbol{G} \cdot \boldsymbol{\operatorname{JF}} 
+\end{align}
+where $\boldsymbol{\operatorname{JF}} $ is the Jacobian defined in (1.3). Similarly, we can compute the integral (1.5) by integral by parts and the quadrature rule:
+\begin{align}
+\nabla_{\theta} L(\theta) &= \int_{\Omega}\nabla_{\theta} u(x,\theta) \left( -\Delta u(x,\theta) + u(x,\theta) -f(x) \right)   dx \\ 
+&+ \int_{\partial \Omega}\nabla_{\theta} u(x,\theta)  \dfrac{\partial \nabla_{\theta}u(x,\theta) }{\partial \boldsymbol{n}} dS \\ 
+&= \boldsymbol{G}\cdot \boldsymbol{F}(\boldsymbol{x},\theta) 
+\end{align}
+Therefore, in the sense of the numerical quadrature and the pseudo-inverse, we have
+\begin{align}
+(\boldsymbol{J} (\theta))^{\dagger} \cdot \nabla_{\theta} L(\theta) = (\boldsymbol{G} \cdot \boldsymbol{\operatorname{JF}} )^{\dagger}\cdot \boldsymbol{G}\cdot \boldsymbol{F}(\boldsymbol{x},\theta)  = (\boldsymbol{\operatorname{JF}})^{\dagger}\cdot (\boldsymbol{G}^{\dagger} \boldsymbol{G}) \cdot \boldsymbol{F}(\boldsymbol{x},\theta),
+\end{align}
+which shows that (\ref{varIter}) for the variational problem is consistent with (\ref{colloIter}) for the collocation problem. 
+
+\begin{remark}
+As we refer to the Moore-Penrose inverse, the assumption that $G$ has linearly independent columns is needed in  order to guarantee $G^{\dagger} G = I \in \mathbb{R}^{(N+n)\times (N+n)}$. This is possible in the case that the number of quadrature points $N+n$ is less equal than that of $\theta$. 
+\end{remark}
+
+\begin{remark}
+The consistency between (\ref{colloIter}) and (\ref{varIter}) reveals that the Gauss quadrature points will be a good choice for the collocation problem, since the equivalent iteration comes form a numerical integration which is much more accurate under the Gauss quadrature rule.
+\end{remark}
+
+\subsection{Convergence analysis}
+\quad\quad In this section, we will analyse the convergence property of the following Gauss-Newton iteration:
+\begin{align}\label{pvarIter}
+\theta_{k+1} = \theta_k - \boldsymbol{J} (\theta_k)^{\dagger}  \nabla_{\theta}L(\theta_k), \quad k=0,1,2,\cdots
+\end{align}
+Firstly, we need the following Wedin's Theorem about a perturbed matrix.
+
+\begin{lemma}\label{lemma5} (Wedin, see \cite{Wedin1973} or \cite{Nieves2016})
+Let $A\in \mathbb{R}^{m\times n}$ and $B = A+E$ with $rank(B) = rank(A)$. Then in any unitary invariant norm $\Vert \cdot \Vert$,
+\begin{align}\label{lemma5one}
+\Vert B^{\dagger} - A^{\dagger} \Vert \leq \mu \Vert A^{\dagger} \Vert_2 \Vert B^{\dagger} \Vert_2 \Vert E \Vert
+\end{align}
+for some moderate constant $\mu > 0$ that depends on the norm used. Moreover, if
+\begin{align}\label{lemma5two}
+\Vert E \Vert_2 < \dfrac{1}{\Vert A^{\dagger} \Vert_2},
+\end{align} 
+then the inverse of $B$ can be bounded by
+\begin{align}\label{lemma5three}
+\Vert B^{\dagger} \Vert_2 \leq \dfrac{\Vert A^{\dagger} \Vert_2}{1-\Vert A^{\dagger} \Vert_2\Vert E \Vert_2}
+\end{align}
+\end{lemma}
+
+\begin{remark}
+An unitary invariant norm $\Vert \cdot \Vert$ satisfies $\Vert A \Vert = \Vert UAV \Vert$ for any unitary matrices $U$ and $V$. Specifically, the $2$-norm, the Frobenius norm and many other norms related to the singular value are unitary invariant norms.
+\end{remark}
+
+Therefore, we can estimate the convergence rate of the Gauss-Newton method based on the Lemmas and thanks to the consistency between two problems, we can consider it for the variational problem only.
+Now assume that the variational problem has stationary point $\theta^*$ such that $\nabla_{\theta} L(\theta^*) = 0$, and assume $\operatorname{rank}{\boldsymbol{J} (\theta^*)} = r \leq m $. From the singular decomposition, we have $J(\theta^*) = U \Sigma V^{T}$ and $J(\theta^*)$ is a r-rank semi-positive definite matrix, i.e.,
+\begin{align}
+\Sigma = diag\left( [\sigma_1,\cdots, \sigma_r, 0,\cdots, 0] \right), \text{ with } \sigma_1 \geq \sigma_2 \geq \cdots \geq \sigma_r >0 \text{, } r\leq m.
+\end{align}
+Then the pseudo-inverse can be represented by
+\begin{align}
+\boldsymbol{J} (\theta^*)^{\dagger} = V \Sigma^{\dagger} U^{T}, \text{ with } \Sigma^{\dagger} = diag\left( \left[\dfrac{1}{\sigma_1},\cdots, \dfrac{1}{\sigma_r}, 0,\cdots, 0\right] \right).
+\end{align}
+
+
+\begin{lemma} \label{lemma6}
+Let $\boldsymbol{J} (\theta)$ be the approximated  Hessian defined in (\ref{HessianL}) and $\theta^*$ be the stationary point. Then there exits a small open set $\Omega_{*} \ni \theta^*$ and constants $\epsilon, \zeta, \alpha > 0$ such that for every $\theta_1, \theta_2 \in \Omega_{*}$, the following inequalities holds:
+\begin{align}
+\Vert \boldsymbol{J} (\theta_2)  \boldsymbol{J} (\theta_2) ^{\dagger} - \boldsymbol{J} (\theta_1)  \boldsymbol{J} (\theta_1) ^{\dagger} \Vert &\leq \zeta \Vert \theta_2 - \theta_1 \Vert, \\
+\Vert \nabla_{\theta}L(\theta_2)  - \nabla_{\theta}L(\theta_1)  - \boldsymbol{J} (\theta_1) \left( \theta_2 - \theta_1 \right) \Vert &\leq  \epsilon \Vert \theta_2 - \theta_1 \Vert + \alpha \Vert \theta_2 - \theta_1 \Vert^2.
+\end{align}
+\end{lemma}
+\begin{proof}
+From the Taylor's expansion, we have 
+\begin{align}
+ &\quad \nabla_{\theta}L(\theta_2)  - \nabla_{\theta}L(\theta_1)  - \boldsymbol{J} (\theta_1)  \left( \theta_2 - \theta_1 \right) \\
+ &= \boldsymbol{\operatorname{HL}}(\theta_1) \left( \theta_2 - \theta_1 \right) - \boldsymbol{J} (\theta_1) \left( \theta_2 - \theta_1 \right) + \mathcal{O}(\Vert \theta_2 - \theta_1 \Vert^2)   \\
+&=\boldsymbol{Q} (\theta_1)\left( \theta_2 - \theta_1 \right) + \mathcal{O}(\Vert \theta_2 - \theta_1 \Vert^2).
+\end{align}
+Therefore, by the smoothness of the Hessian with respect to $\theta$ and Lemma~\ref{lemma4}, there exists a small neighbour $\Omega_*$ of $\theta^*$ and a constant $\alpha > 0$, such that $\Vert \boldsymbol{Q} (\theta_1) \Vert \leq \epsilon$, and 
+\begin{align}
+\Vert \nabla_{\theta}L(\theta_2)  - \nabla_{\theta}L(\theta_1)  -\boldsymbol{J} (\theta_1) \left( \theta_2 - \theta_1 \right) \Vert \leq  \epsilon\Vert \theta_2 - \theta_1 \Vert + \alpha \Vert \theta_2 - \theta_1 \Vert^2.
+\end{align}
+for every $\theta_1, \theta_2 \in \Omega_{*}$. On the other hand, Weyl’s Theorem guarantees the singular value to be continuous with respect to the matrix entries. Therefore, as the open set $\Omega_{*}$ being sufficiently small, it holds
+\begin{align}
+&\sup_{\theta \in \Omega_*}\Vert  \boldsymbol{J} (\theta) \Vert  = \sup_{\theta \in \Omega_*} \sigma_1( \boldsymbol{J} (\theta))  \leq C \Vert \boldsymbol{J} (\theta^*)\Vert \\ 
+&\sup_{\theta \in \Omega_*}\Vert  \boldsymbol{J} (\theta) ^{\dagger} \Vert  = 
+\dfrac{1}{\sup_{\theta \in \Omega_*} \sigma_r( \boldsymbol{J} (\theta)) } \leq C  \Vert \boldsymbol{J} (\theta^*)^{\dagger} \Vert
+\end{align}
+for all $\theta \in \Omega_*$. By the smoothness of $\boldsymbol{J} (\theta)$ with respect to $\theta$ and the estimation in Lemma~\ref{lemma5}, we have 
+\begin{align}
+&\quad \Vert \boldsymbol{J} (\theta_2)  \boldsymbol{J} (\theta_2) ^{\dagger} - \boldsymbol{J} (\theta_1)  \boldsymbol{J} (\theta_1) ^{\dagger} \Vert  \\ 
+& \leq \Vert \boldsymbol{J} (\theta_2)^{\dagger} \Vert \Vert \boldsymbol{J} (\theta_2)  - \boldsymbol{J} (\theta_1) \Vert + \Vert \boldsymbol{J} (\theta_1) \Vert \Vert \boldsymbol{J} (\theta_2) ^{\dagger}  -\boldsymbol{J} (\theta_1) ^{\dagger}   \Vert\\
+&\leq \zeta \Vert \theta_2 - \theta_1 \Vert.
+\end{align}
+\end{proof}
+
+\begin{theorem}(Convergence Theorem)
+Let $L(\theta)$ be a sufficiently smooth target function of $\theta$ and $\boldsymbol{J} (\theta)$ be the approximated Hessian of $L(\theta)$ defined in (\ref{HessianL}). Then for every open neighbourhood $\Omega_1$ of $\theta^*$, there exists another  neighbourhood $\Omega_2 \ni \theta^*$ such that, from every initial guess $\theta_0 \in \Omega_2$, the sequence $\lbrace \theta_k \rbrace_{k=1}^{\infty}$ generated by the iteration (\ref{varIter}) converges in  $\Omega_1$. Furthermore, $\lbrace \theta_k \rbrace_{k=1}^{\infty}$  has at least linear convergence with a coefficient $\gamma \leq 2\epsilon$ when $k$ is large enough.
+\end{theorem}
+
+\begin{proof}
+Firstly, Let $\Omega_*$ be the small open neighbourhood in Lemma~\ref{lemma6} such that $\Vert \boldsymbol{Q} (\theta) \Vert \leq \epsilon < \frac{1}{2}$. For any open neighbourhood $\Omega_1$ of $\theta^*$, there exists a constant $0<\delta<2$ such that $B(\theta^*, \delta) \subset \Omega_1 \cap \Omega_*$ and for  any $\theta_1, \theta_2 \in B(\theta^*, \delta) $, it holds
+\begin{align}
+\Vert \boldsymbol{J} (\theta_2)^{\dagger} \Vert \left( \alpha \Vert \theta_2 - \theta_1 \Vert + \zeta \Vert \nabla_{\theta} L (\theta_1)  \Vert \right) \leq h < 1.
+\end{align}
+On the other hand, there also exists $0<\tau<\frac{\delta}{2}$ such that
+\begin{align}
+ \Vert \boldsymbol{J} (\theta)^{\dagger} \Vert \Vert\nabla_{\theta}L(\theta)\Vert \leq \dfrac{1-h}{2} \delta  < \dfrac{\delta}{2} <1
+\end{align}
+holds for any $\theta \in B(\theta^*, \tau)$. Let $\Omega_2 = B(\theta^*, \tau)$, then for $\forall \theta_0 \in \Omega_2$, the iteration implies 
+\begin{align}
+\Vert \theta_1 - \theta^* \Vert \leq \Vert \theta_1 - \theta_0 \Vert + \Vert \theta_0 - \theta^* \Vert \leq  \Vert \boldsymbol{J} (\theta_0)^{\dagger} \Vert \Vert\nabla_{\theta}L(\theta_0)\Vert + \tau < \delta.
+\end{align}
+Next we assume that $\theta_k \in B(\theta^*, \delta)$ for some integer $k \geq 1$. From Lemma~\ref{lemma6} we have the following estimation 
+
+\begin{align}
+\quad \Vert \theta_{k+1} - \theta_k \Vert &= \Vert \boldsymbol{J} (\theta_k)^{\dagger} \nabla_{\theta}L(\theta_k) \Vert \\
+& = \Vert \boldsymbol{J} (\theta_k)^{\dagger}\left( \nabla_{\theta}L(\theta_k) - \boldsymbol{J} (\theta_{k-1})  \left(\theta_k - \theta_{k-1} + \boldsymbol{J}(\theta_{k-1})^{\dagger}  \nabla_{\theta}L(\theta_{k-1}) \right) \right)  \Vert \\ 
+&\leq \Vert  \boldsymbol{J} (\theta_k)^{\dagger} \left( \nabla_{\theta}L(\theta_k)  - \nabla_{\theta}L(\theta_{k-1}) - \boldsymbol{J} (\theta_{k-1}) (\theta_k-\theta_{k-1}) \right) \Vert \\ 
+&\quad + \Vert \boldsymbol{J} (\theta_k)^{\dagger}  \left(\boldsymbol{J} (\theta_k) \boldsymbol{J} (\theta_k)^{\dagger} - \boldsymbol{J} (\theta_{k-1}) \boldsymbol{J} (\theta_{k-1})^{\dagger}  \right) \nabla_{\theta}L(\theta_{k-1}) \Vert \\ 
+&\leq \Vert \boldsymbol{J} (\theta_k)^{\dagger} \Vert \left( \alpha \Vert \theta_k - \theta_{k-1} \Vert + \zeta \Vert \nabla_{\theta} L (\theta_{k-1})  \Vert + \epsilon \right) \Vert \theta_k - \theta_{k-1} \Vert.\label{3.44}
+\end{align}
+Since $\theta_{k} \in B(\theta^*,\delta)$, then it leads to 
+\begin{align}\label{convergence}
+\Vert \theta_{k+1} - \theta_k \Vert < h \Vert \theta_k - \theta_{k-1} \Vert < \Vert \theta_k - \theta_{k-1} \Vert
+\end{align}
+so the convergence is guaranteed. Therefore, we obtain that $\Vert \theta_{j} - \theta_{j-1} \Vert \leq h^j \Vert \theta_{1} - \theta_{0} \Vert $ for $1\leq j \leq k+1$, and
+\begin{align}
+\Vert \theta_{k+1} - \theta^* \Vert &\leq \Vert \theta_0 - \theta^* \Vert + \sum_{j=0}^{k} \Vert  \theta_{k-j+1} - \theta_{k-j} \Vert \\
+&\leq \Vert \theta_0 - \theta^* \Vert + \sum_{j=0}^{k} h^j \Vert  \theta_{0} - \theta^* \Vert \\
+&< \dfrac{1}{1-h} \Vert  \theta_{1} - \theta_{0} \Vert +\Vert  \theta_{0} - \theta^* \Vert  \\
+&< \dfrac{1}{1-h}\dfrac{h-1}{2}\delta + \dfrac{1}{2}\delta  =  \delta,
+\end{align}
+which completes the induction. Thus we conclude that the sequence $\lbrace \theta_k \rbrace_{k=0}^{\infty} \subset B(\theta^*, \delta) \subset \Omega_1 $ as long as the initial iterate $\theta_0 \in B(\theta^*, \tau) = \Omega_2$.
+
+
+\quad\quad Secondly, let us define $\hat{\theta} = \lim_{k\rightarrow \infty} \theta_{k}$ so that $\hat{\theta} \in \Omega_1$. By the smoothness of $\nabla_{\theta}L(\theta)$ and the convergence property (\ref{convergence}), there exists a constant $\mu>0$ such that
+\begin{align}
+\Vert \nabla_{\theta}L(\theta_{k-1}) \Vert &=  \Vert \nabla_{\theta}L(\theta_{k-1}) - \nabla_{\theta}L(\hat{\theta}) \Vert \\
+&\leq \mu \Vert \theta_{k-1} - \hat{\theta} \Vert \\
+& \leq \mu\left( \Vert \theta_{k-1} - \theta_k \Vert + \Vert \theta_k - \theta_{k+1} \Vert + \cdots \right)  \\
+& \leq \dfrac{\mu}{1-h} \Vert \theta_k - \theta_{k-1} \Vert.\label{3.53}
+\end{align}
+Now let us combine (\ref{3.44}) and (\ref{3.53}) to find that
+\begin{align}
+\Vert \theta_{k+1} - \theta_k \Vert &\leq \beta \Vert \theta_k - \theta_{k-1} \Vert^2 + \epsilon \Vert \theta_k - \theta_{k-1} \Vert \\
+ & = \left( \beta \Vert \theta_k - \theta_{k-1} \Vert + \epsilon \right)\Vert \theta_k - \theta_{k-1} \Vert
+\end{align}
+for some constant $\beta>0$. As $k$ grows sufficiently large, the convergence implies that 
+\begin{align}
+\left( \beta \Vert \theta_k - \theta_{k-1} \Vert + \epsilon  \right) \leq \gamma \leq  2 \epsilon < 1.
+\end{align}
+Therefore 
+\begin{align}
+\Vert \theta_{k+1} - \theta_k \Vert &\leq \gamma  \Vert \theta_k - \theta_{k-1} \Vert\\
+&\leq \gamma^k \Vert \theta^{1} - \theta^{0} \Vert \\
+& \leq \gamma^k \vert \Omega_* \vert.
+\end{align}
+
+On the other hand, it can be easily seen that 
+\begin{align}
+\Vert \theta_{k+1} - \hat{\theta} \Vert &= \Vert \theta_{k+1} - \theta^{k+2} \Vert + \Vert \theta^{k+2} - \theta^{k+3} \Vert  +  \Vert \theta^{k+3} - \theta^{k+4} \Vert  +  \cdots \\
+&\leq \left( h + h^2 + h^3 + \cdots \right) \Vert \theta_{k+1} - \theta_k \Vert \\
+&\leq \dfrac{h}{1-h} \Vert \theta_{k+1} - \theta_k \Vert.
+\end{align}
+
+Hence 
+\begin{align}
+\Vert \theta_{k+1} - \hat{\theta} \Vert \leq \dfrac{h}{1-h} \vert \Omega_* \vert \gamma^k.
+\end{align}
+
+The estimation above shows that $\lbrace \Vert \theta_{k+1} - \hat{\theta} \Vert \rbrace_{k=1}^{\infty}$ is a decreasing and is at least a linear convergence sequence with coefficient $\gamma$. Since $\gamma$ can be very small due to the construction of this iteration, the parameter sequence $\lbrace \theta_k \rbrace_{k=1}^{\infty}$ will be observed to converge rapidly in the numerical experiments.
+
+\end{proof}
+
+%\begin{align}
+%\tau^{k+1} \leq \tau^k (h\delta + \epsilon)
+%\end{align}
+%\begin{align}
+%\tau^k \leq (h\delta + \epsilon)^k\tau^0
+%\end{align}
+%\begin{align}
+%\tau^{k+1} &\leq h((\tau^k)^2) + (\epsilon)^k\tau^0 \\
+%&\leq h(h(\tau^{k-1})^2 + \epsilon^{k-1}\tau^0)^2 + (\epsilon)^k\tau^0 \\
+%& \leq h^3 (\tau^{k-1})^4 + 2h^2 (\tau^{k-1})^2 \epsilon^{k-1}\tau^0 + h(\epsilon^{k-1}\tau^0)^2 + (\epsilon)^k\tau^0 \\
+%&\leq \cdots \\
+%&\lesssim h^{2^k-1} (\tau^0)^{2^k} + \tau^0 \left( \epsilon^k + \epsilon^{2(k-1)} + \epsilon^{3(k-1)} + \cdots\right) \\ 
+%& \lesssim  h^{2^k-1} (\tau^0)^{2^k} + (2\epsilon)^k \tau^0
+%\end{align}
+%We might come across coefficients such as
+%\begin{align}
+%h^{2^j} C_{2^j}^{l} = h^{2^j} \dfrac{2^j !}{l! (2^j-l)!	} \leq h^{2^j} 2^j! \leq C 
+%\end{align}
+%where $C$ is independent of $l$ or $j$.
+
+
+
+\newpage
+% Thus we have by the Taylor expansion that
+%\begin{align}
+%\nabla_{\theta} L(\theta_k) = \nabla_{\theta}L(\theta^*) + HL(\theta^* )(\theta_k-\theta^*) +  \mathcal{O}(\Vert \theta_k-\theta^* \Vert^2)
+%\end{align}
+%By denoting $E^k = \theta_k - \theta^*$ and multiplying $-J(\theta_k)^{\dagger}$ to both sides of the formula above, we see
+%\begin{align}
+%E^{k+1} = E^{k} - J(\theta_k)^{\dagger} HL(\theta^*) E^{k} + \mathcal{O}(\Vert \theta_k-\theta^* \Vert^2).
+%\end{align}
+%Next, from the smoothness of $J(\theta)^{\dagger}$ with respect to $\theta$, we have the expansion
+%\begin{align}
+%J(\theta_k) ^{\dagger} = J(\theta^*)^{\dagger} + \mathcal{O}(\Vert \theta_k-\theta^* \Vert).
+%\end{align}
+%Therefore, 
+%\begin{align}\label{EkIter}
+%E^{k+1} = E^{k} - J(\theta^*)^{\dagger} J(\theta^*) E^{k} - J(\theta^*)^{\dagger} Q(\theta^*) E^{k}  + \mathcal{O}(\Vert \theta_k-\theta^* \Vert^2).
+%\end{align}
+%Suppose that we have the singular decomposition $J(\theta^*) = U \Sigma V^{T}$ and $J(\theta^*)$ is a r-rank semi-positive definite matrix, i.e.,
+%\begin{align}
+%\Sigma = diag\left( [\sigma_1,\cdots, \sigma_r, 0,\cdots, 0] \right), \text{ with } \sigma_1 \geq \sigma_2 \geq \cdots \geq \sigma_r >0 \text{, } r\leq m.
+%\end{align}
+%Then $J(\theta^*)^{\dagger} J(\theta^*) = V \Sigma^{\dagger} \Sigma V^T = V I_{r} V^{T}$ in which $I_{r}=\operatorname{diag}\left([\underbrace{1, \ldots, 1}_{r}, 0, \ldots, 0]\right)$ and we also define $I_{m-r}=\operatorname{diag}\left([\underbrace{0, \ldots, 0}_{r}, 1, \ldots, 1]\right)$.  Firstly we observe that $I_{m-r} V^{T} J(\theta^*)^{\dagger} J(\theta^*) = I_{m-r} I_r V^{T} = 0 $ and hence
+%\begin{align}
+%I_{m-r} V^{T} E^{k+1} &= I_{m-r} V^{T} E^{k} - I_{m-r} V^{T} J(\theta^*)^{\dagger} Q(\theta^*) E^{k} +  \mathcal{O}(\Vert \theta_k-\theta^* \Vert^2) \\
+%&= I_{m-r} V^{T} E^{k} - I_{m-r} \Sigma^{\dagger} U^{T} Q(\theta^*) E^{k} +  \mathcal{O}(\Vert \theta_k-\theta^* \Vert^2) \\ 
+%& =  I_{m-r} V^{T} E^{k} + \mathcal{O}(\Vert \theta_k-\theta^* \Vert^2) \\ 
+%&\approx  I_{m-r} V^{T} E^{k},
+%\end{align}
+%which shows that the iteration does not work on the solution on the kernel of $J(\theta^*)$ very obviously. So we need to consider the convergence of $I_{r} V^{T} E^{k}$ only. From (\ref{EkIter}) we can see
+%\begin{align}
+%I_{r} V^{T} E^{k+1} &= \left( I_{r} V^{T} -  I_{r} V^{T} \right) E^{k} -  I_{r} V^{T}  J(\theta^*)^{\dagger} Q(\theta^*) E^{k} + \mathcal{O}(\Vert \theta_k-\theta^* \Vert^2)\\
+%&= - I_{r} \Sigma^{\dagger} U^{T} Q(\theta^*) E^{k} + \mathcal{O}(\Vert \theta_k-\theta^* \Vert^2).
+%\end{align}
+%If we choose $\Vert \cdot \Vert$ to be an unitary-invariant norm, then we have an estimation 
+%\begin{align}
+%\Vert E^{k+1} \Vert  &= \Vert V^{T} E^{k+1} \Vert \leq \Vert I_{r} V^{T} E^{k+1} \Vert + \Vert I_{m-r} V^{T} E^{k+1} \Vert \\
+%&\leq \Vert I_{r} \Sigma^{\dagger} U^{T} \Vert \Vert Q(\theta^*)\Vert  \Vert E^{k} \Vert + \Vert I_{m-r} V^{T} E^{k}\Vert + \mathcal{O}(\Vert \theta_k-\theta^* \Vert^2).
+%\end{align}
+%Can we choose $E^k$ such that $ \Vert I_{m-r} V^{T} E^{k}\Vert $ is small enough? How to estimate $\Vert I_{r} \Sigma^{\dagger} U^{T} \Vert \Vert Q(\theta^*)\Vert$?
+
+\section{Gauss-Newton Iteration with Monte-Carlo method}
+
+
+\begin{thebibliography}{9}
+
+\small
+
+\bibitem{RitzE2017}
+The Deep Ritz method: A deep learning-based numerical algorithm for solving variational problems. Weinan E and Bing Yu.
+
+\bibitem{XuJCM2018}
+RELU DEEP NEURAL NETWORKS AND LINEAR FINITE ELEMENTS*
+
+\bibitem{Wedin1973}
+PERTURBATION THEORY FOR PSEUDO-INVERSES
+
+\bibitem{Nieves2016}
+Nieves Castro-Gonz\' alez a, Froil\' an M. Dopico b, Juan M. Molera b. Multiplicative perturbation theory of the Moore-Penrose inverse and the least squares problem.
+
+\end{thebibliography}
+
+
+
+\end{document}
+
+
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+ 
+
+\begin{figure}[H] 
+\centering
+\subfigure[loss, $N = 1e4$, $m = 80$, 1-D]{
+\includegraphics[width=0.45\textwidth]
+{loss_N1e4_m80.png}}
+\hspace{0.5cm}
+\subfigure[solutions, $N = 1e4$, $m = 80$ 1-D]{
+\includegraphics[width=0.45\textwidth]
+{sol_N1e4_m80.png}}\\
+\caption{loss and solutions}
+\end{figure} 
+ 
+\begin{figure}[H] 
+\centering
+\subfigure[loss, $N = 1e4$, $m = 100$, 1-D]{
+\includegraphics[width=0.45\textwidth]
+{loss_N1e4_m100.png}}
+\hspace{0.5cm}
+\subfigure[solutions,$N = 1e4$, $m = 100$, 1-D]{
+\includegraphics[width=0.45\textwidth]
+{sol_N1e5_m80.png}}\\
+\caption{loss and solutions}
+\end{figure}  
+
+\begin{figure}[H] 
+\centering
+\subfigure[loss, $N = 1e5$, $m = 80$, 1-D]{
+\includegraphics[width=0.45\textwidth]
+{loss_N1e5_m80.png}}
+\hspace{0.5cm}
+\subfigure[solutions, $N = 1e5$, $m = 80$, 1-D]{
+\includegraphics[width=0.45\textwidth]
+{sol_N1e4_m100.png}}\\
+\caption{loss and solutions}
+\end{figure}  
+
+
+
+\begin{figure}[H]
+\centering
+\subfigure[Values of $x^*$ with n=1000, (A), function 3]{
+\includegraphics[width=0.8\textwidth]
+{L1_3_n1000_A_m15.eps}}
+\hspace{0.5cm}
+\subfigure[Values of $x^*$ with n=1000, (A), function 4]{
+\includegraphics[width=0.8\textwidth]
+{L1_4_n1000_A_m15.eps}}\\
+\caption{$x^*$ obtained by L-BFGS method, with $m=15$}
+\end{figure}
+
+
+
+
+
+
+%\quad\quad Now let $d_k = \theta_{k+1} - \theta_k$. From the Taylor's expansion, we have
+%\begin{align*}
+%0 = \nabla_{\theta} L(\theta^*)  = \nabla_{\theta} L(\theta_k) + HL(\theta_k)(\theta^*-\theta_k) + \mathcal{O}(\Vert \theta^*-\theta_k \Vert^2)
+%\end{align*}
+%thus
+%\begin{align*}
+%0 &= J(\theta_k)^{\dagger} \nabla_{\theta} L(\theta_k) + J(\theta_k)^{\dagger}  HL(\theta_k)(\theta^*-\theta_k) + \mathcal{O}(\Vert \theta^*-\theta_k \Vert^2) \\
+%&= -d_k + \left( HL(\theta_k) - Q(\theta_k) \right)^{\dagger} HL(\theta_k) (\theta^*-\theta_k) + \mathcal{O}(\Vert \theta^*-\theta_k \Vert^2) \\ 
+%&= \theta_k - \theta_{k+1} + \theta^*- \theta_k + {\color{blue}\left( \left( HL(\theta_k) - Q(\theta_k) \right)^{\dagger}HL(\theta_k)  - I \right) } (\theta^*-\theta_k) + \mathcal{O}(\Vert \theta^*-\theta_k \Vert^2) \\ 
+%&= \theta^*- \theta_{k+1} + {\color{blue}\left( \left( HL(\theta_k) - Q(\theta_k) \right)^{\dagger}HL(\theta_k)  - I \right) } (\theta^*-\theta_k) + \mathcal{O}(\Vert \theta^*-\theta_k \Vert^2) \\ 
+%\end{align*}
+ 
+
+
+
+
+
+
+
